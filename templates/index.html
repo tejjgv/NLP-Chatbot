@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="chat-container">
+        <h2>Chat with Robo</h2>
+        <textarea id="base-text" placeholder="Enter the base text for the chatbot here..."></textarea>
+        <button id="set-base-text-btn">Set Base Text</button>
+
+        <div id="chatbox" style="display: none;">
+            <div id="chat-output"></div>
+            <input type="text" id="user-input" placeholder="Type your message here..." />
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const baseTextInput = document.getElementById("base-text");
+        const setBaseTextButton = document.getElementById("set-base-text-btn");
+        const chatBox = document.getElementById("chatbox");
+        const sendButton = document.getElementById("send-btn");
+        const userInput = document.getElementById("user-input");
+        const chatOutput = document.getElementById("chat-output");
+
+        // Set base text for the chatbot
+        setBaseTextButton.addEventListener("click", () => {
+            const baseText = baseTextInput.value.trim();
+            if (baseText) {
+                fetch("/set_base_text", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ base_text: baseText })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    chatBox.style.display = "block"; // Show chat box
+                    baseTextInput.disabled = true; // Disable base text input
+                    setBaseTextButton.disabled = true;
+                })
+                .catch(error => console.error("Error:", error));
+            } else {
+                alert("Please enter the base text!");
+            }
+        });
+
+        // Send a message to the chatbot
+        sendButton.addEventListener("click", () => {
+            const userMessage = userInput.value.trim();
+            if (userMessage) {
+                // Display user message
+                const userDiv = document.createElement("div");
+                userDiv.textContent = `You: ${userMessage}`;
+                chatOutput.appendChild(userDiv);
+
+                // Send message to backend
+                fetch("/get_response", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ message: userMessage })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Display bot response
+                    const botDiv = document.createElement("div");
+                    botDiv.textContent = `Robo: ${data.response}`;
+                    chatOutput.appendChild(botDiv);
+                    userInput.value = ""; // Clear input
+                    chatOutput.scrollTop = chatOutput.scrollHeight; // Auto-scroll
+                })
+                .catch(error => console.error("Error:", error));
+            }
+        });
+
+        userInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                sendButton.click();
+            }
+        });
+    </script>
+</body>
+</html>
