@@ -1,5 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session
-from flask_session import Session
+from flask import Flask, render_template, request, jsonify
 import random
 import string
 import nltk
@@ -10,17 +9,16 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-# Flask app setup
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_secret_key'
-app.config['SESSION_TYPE'] = 'filesystem'
-Session(app)
-
 # Pre-load NLTK data
 nltk.download('punkt', quiet=True)
 nltk.download('wordnet', quiet=True)
 
+# Initialize Flask app
+app = Flask(__name__)
+
+# Global variables for the chatbot
 lemmer = WordNetLemmatizer()
+sent_tokens = []  # Dynamic corpus
 
 def LemTokens(tokens):
     return [lemmer.lemmatize(token) for token in tokens]
@@ -39,7 +37,9 @@ def greeting(sentence):
         if word.lower() in GREETING_INPUTS:
             return random.choice(GREETING_RESPONSES)
 
-def response(user_response, sent_tokens):
+# Chatbot response generation
+def response(user_response):
+    global sent_tokens
     robo_response = ''
     sent_tokens.append(user_response)
     TfidfVec = TfidfVectorizer(tokenizer=LemNormalize, stop_words='english')
@@ -58,33 +58,28 @@ def response(user_response, sent_tokens):
 
 @app.route("/")
 def home():
-    # Clear session on page refresh
-    session.clear()
     return render_template("index.html")
 
 @app.route("/set_base_text", methods=["POST"])
 def set_base_text():
+    global sent_tokens
     base_text = request.json.get("base_text", "").lower()
-    if 'sent_tokens' not in session:
-        session['sent_tokens'] = []
-    session['sent_tokens'] = nltk.sent_tokenize(base_text)  # Tokenize the base text
+    sent_tokens = nltk.sent_tokenize(base_text)  # Tokenize the base text
     return jsonify({"message": "Base text set successfully!"})
 
 @app.route("/get_response", methods=["POST"])
 def get_response():
+    global sent_tokens
     user_message = request.json.get("message", "").lower()
-    if 'sent_tokens' not in session or not session['sent_tokens']:
+    if not sent_tokens:
         return jsonify({"response": "Please provide the base text first!"})
-    sent_tokens = session['sent_tokens']
     if user_message in ["bye", "exit"]:
         return jsonify({"response": "Bye! Take care."})
     if user_message in ["thanks", "thank you"]:
         return jsonify({"response": "You are welcome!"})
     if greeting(user_message) is not None:
         return jsonify({"response": greeting(user_message)})
-    bot_response = response(user_message, sent_tokens)
-    session['sent_tokens'] = sent_tokens  # Update session with modified tokens
-    return jsonify({"response": bot_response})
+    return jsonify({"response": response(user_message)})
 
 if __name__ == "__main__":
     app.run(debug=True)
